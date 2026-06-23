@@ -29,11 +29,19 @@
 #pragma link C++ function DrawCalibrationResiduals;
 #pragma link C++ function ApplyCalibration;
 
+#pragma link C++ class GCalibration+;
+#pragma link C++ class GCalibrationPoint+;
+
 #pragma link C++ function GetSignals;
 
 #pragma link C++ function CloseAllCanvases;
 
 #pragma link C++ function GRootInteract;
+
+#pragma link C++ class GLearning+;
+#pragma link C++ class GLearningLine+;
+#pragma link C++ class GLearningPeak+;
+#pragma link C++ class std::vector<GLearningPeak>+;
 
 #pragma link C++ class GCanvas+;
 #pragma link C++ class GMarker+;

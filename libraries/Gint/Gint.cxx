@@ -223,6 +223,9 @@ bool Gint::LoadCalibrationFile(const std::string& filename) {
     return false;
   }
 
+
+
+
   std::string line;
   while(std::getline(input, line)) {
     if(line.empty()) {
@@ -258,6 +261,34 @@ bool Gint::LoadCalibrationFile(const std::string& filename) {
   return true;
 }
 
+auto parseTimeSeconds = [](const std::string& line) {
+  size_t equals = line.find('=');
+
+  if(equals == std::string::npos)
+    return 0.0;
+
+  std::string value = line.substr(equals + 1);
+
+  int hours = 0;
+  int minutes = 0;
+  double seconds = 0;
+
+  if(sscanf(value.c_str(),
+            " %d:%d:%lf",
+            &hours,
+            &minutes,
+            &seconds) == 3) {
+    return hours * 3600.0 +
+           minutes * 60.0 +
+           seconds;
+  }
+
+  try {
+    return std::stod(value);
+  } catch(...) {
+    return 0.0;
+  }
+};
 
 
 
@@ -277,6 +308,11 @@ TH1D* Gint::OpenTxt3File(const std::string& filename) {
   double c1 = 1;
   double c2 = 0;
   std::string unit = "keV";
+  double liveTime = 0;
+  double realTime = 0;
+
+
+
 
   std::string line;
   while(std::getline(input, line)) {
@@ -297,10 +333,15 @@ TH1D* Gint::OpenTxt3File(const std::string& filename) {
 	continue;
     }
 
-    if(line.find("RealTime") != std::string::npos ||
-       line.find("LiveTime") != std::string::npos) {
-      continue;
-    }
+if(line.find("RealTime") != std::string::npos) {
+  realTime = parseTimeSeconds(line);
+  continue;
+}
+
+if(line.find("LiveTime") != std::string::npos) {
+  liveTime = parseTimeSeconds(line);
+  continue;
+}  
 
     std::stringstream ss(line);
     double channel = 0;
@@ -348,6 +389,8 @@ TH1D* Gint::OpenTxt3File(const std::string& filename) {
   hist->GetListOfFunctions()->Add(new TParameter<double>("C0", c0));
   hist->GetListOfFunctions()->Add(new TParameter<double>("C1", c1));
   hist->GetListOfFunctions()->Add(new TParameter<double>("C2", c2));
+  hist->GetListOfFunctions()->Add(new TParameter<double>("LiveTime", liveTime));
+  hist->GetListOfFunctions()->Add(new TParameter<double>("RealTime", realTime));
   hist->GetListOfFunctions()->Add(new TObjString(("unit=" + unit).c_str()));
 
   hist->GetXaxis()->SetTitle(unit.c_str());

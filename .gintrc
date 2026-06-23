@@ -39,6 +39,6 @@ Root.Fitter: Fumili2
 
 #Gui.Backend: qt
 #Gui.Factory: qt
-Gui.IconPath:      $(GSYS)/icons:$(ROOTSYS)/icons
+Gui.IconPath:      $(GSYS)/icons:$(ROOTSYS)/share/root/icons:$(ROOTSYS)/icons
 #$(ROOTSYS)/etc/root.mimes
 Gui.MimeTypeFile:  $(GSYS)/.gint.mimes

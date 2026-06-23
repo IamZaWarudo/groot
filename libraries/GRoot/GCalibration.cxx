@@ -1,6 +1,8 @@
 #include <GCalibration.h>
 
 #include <TF1.h>
+#include <TFitResult.h>
+#include <TFitResultPtr.h>
 #include <TGraphErrors.h>
 
 #include <fstream>
@@ -115,7 +117,14 @@ bool GCalibration::Fit(int order, const char* unit) {
   }
 
   TF1 fit("calibration_fit", order == 1 ? "pol1" : "pol2");
-  graph.Fit(&fit, "Q");
+  TFitResultPtr result = graph.Fit(&fit, "QSEX0");
+
+  if(!result.Get() || !result->IsValid() || int(result) != 0) {
+    std::cout << "Energy calibration fit failed."
+              << " Status = " << int(result)
+              << std::endl;
+    return false;
+  }
 
   fC0 = fit.GetParameter(0);
   fC1 = fit.GetParameter(1);

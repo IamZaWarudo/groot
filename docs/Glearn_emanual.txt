@@ -1,0 +1,141 @@
+GLearning Quick Manual
+======================
+
+GLearning provides a simple workflow for energy calibration and
+absolute-efficiency analysis using Eu-152 or Co-60 spectra.
+
+
+1. Grab the displayed spectrum
+--------------------------------
+
+Click the canvas containing the spectrum, then enter:
+
+TH1* h = GrabHist();
+h->Print();
+
+
+2. Start GLearning
+------------------
+
+GLearning learn(h);
+
+learn.SetSource("Eu-152");
+learn.SetActivity(125000);
+learn.SetElapsedDays(4);
+learn.SetLiveTime(8304.535);
+
+learn.Start();
+
+Activity is measured in Bq.
+Elapsed time is measured in days.
+Live time is measured in seconds.
+
+Supported sources:
+
+learn.SetSource("Eu-152");
+learn.SetSource("Co-60");
+
+
+3. Fit and assign peaks
+-----------------------
+
+For each known gamma line:
+
+1. Place two markers around the peak.
+2. Press g to perform a Gaussian fit.
+3. Immediately assign the fitted peak to its known energy.
+
+Example:
+
+learn.AcceptLastFit(121.782);
+
+Repeat the process for other Eu-152 lines:
+
+learn.AcceptLastFit(244.697);
+learn.AcceptLastFit(344.279);
+learn.AcceptLastFit(778.904);
+learn.AcceptLastFit(964.079);
+learn.AcceptLastFit(1112.069);
+learn.AcceptLastFit(1408.006);
+
+IMPORTANT:
+Perform a new Gaussian fit before every AcceptLastFit() call.
+
+Inspect the accepted peaks:
+
+learn.PrintPeaks();
+
+
+4. Perform the energy calibration
+---------------------------------
+
+Fit centroid channel against known gamma energy:
+
+learn.FitEnergyCalibration(1);
+learn.DrawEnergyCalibration();
+
+Create an energy-calibrated copy of the spectrum:
+
+TH1D* calibrated =
+  learn.MakeCalibratedSpectrum("Eu152_calibrated");
+
+if(calibrated)
+  calibrated->Draw();
+
+The original spectrum remains unchanged.
+
+
+5. Calculate absolute efficiency
+--------------------------------
+
+Calculate and display the efficiency points:
+
+learn.BuildEfficiencyPoints();
+learn.DrawEfficiency();
+
+Fit the recommended HPGe efficiency model:
+
+learn.FitEfficiency();
+
+Alternatively, fit a polynomial:
+
+learn.FitEfficiencyPolynomial(3);
+
+
+6. Disable or re-enable a point
+-------------------------------
+
+Disable a suspicious point by its index:
+
+learn.EnablePoint(3, false);
+
+Then repeat the calculations:
+
+learn.FitEnergyCalibration(1);
+learn.BuildEfficiencyPoints();
+learn.DrawEfficiency();
+learn.FitEfficiency();
+
+Re-enable the point:
+
+learn.EnablePoint(3, true);
+
+
+7. Save the results
+-------------------
+
+learn.Save("eu152_analysis.learn");
+
+
+Core workflow
+-------------
+
+Grab spectrum
+-> configure source
+-> mark and fit a peak
+-> assign its known energy
+-> fit the energy calibration
+-> calculate efficiency points
+-> fit the efficiency curve
+-> save the results
+
