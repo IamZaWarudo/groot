@@ -144,7 +144,7 @@ Histomatic::Histomatic() : TGMainFrame(gClient->GetRoot(),350,780), fVf(0) {
   fEventTimer = new GEventTimer();
   fEventTimer->Start();
 
-  this->Move(dw-width*1.1,50);
+  //this->Move(dw-width*1.1,50);
 }
 
 Histomatic *Histomatic::Get() {
