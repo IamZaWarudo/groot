@@ -609,6 +609,12 @@ bool GRootInteractHistKeyPress(TH1 *currentHist,GInteractionInfo &info) {
         px->Draw();
       }
       break;
+   case kKey_X:
+      if(currentHist->InheritsFrom(TH2::Class())) {
+        TH2* temp = static_cast<TH2*>(currentHist);
+        temp->SetShowProjectionX(1);   
+      }
+      break; 
     case kKey_y:
       if(currentHist->InheritsFrom(GH2D::Class())) {
         double ylow = currentHist->GetYaxis()->GetBinLowEdge(currentHist->GetYaxis()->GetFirst());
