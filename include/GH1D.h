@@ -8,6 +8,9 @@
 #include<TH2.h>
 //#include<TQObject.h>
 
+class TF1;
+class TVirtualPad;
+
 class GH1D : public TH1D { //, public TQObject {
   public:
     GH1D();
@@ -34,6 +37,14 @@ class GH1D : public TH1D { //, public TQObject {
 
     void Paint(Option_t *opt="") override;
     int DistancetoPrimitive(int px, int py) override;
+
+    void SetShowResiduals(bool flag=true);
+    void ToggleResiduals();
+    bool ShowResiduals() const { return fShowResiduals; }
+    bool IsShowingResiduals() const { return ShowResiduals(); }
+    void SetResidualFit(TF1 *fit,double xlow,double xhigh);
+    void ClearResidual();
+    void UpdateResidualDisplay(TVirtualPad *pad=nullptr);
 
     TH1* Rebin(int ngroup=2,const char *newname="",const double *xbins=nullptr) override;
     void Unbin(int ngroup=-1);
@@ -79,6 +90,7 @@ class GH1D : public TH1D { //, public TQObject {
     void Init();
 		void SetOriginal();
 		void ResetToOriginal();
+    TH1D *MakeResidualHist() const;
 
   private:
     //owned pointers
@@ -89,14 +101,19 @@ class GH1D : public TH1D { //, public TQObject {
 		//TH1D *fSubtract;
 		double fScale;
 
-		int  fOriginalBins;
+    int  fOriginalBins;
     bool fIsNormalized;
+    bool fShowResiduals;
+    TF1  *fResidualFit;  //! non-owning; fit is owned by the caller/histogram
+    TH1D *fResidualHist; //!
+    double fResidualXLow;
+    double fResidualXHigh;
     
     //borrowed pointer
     TH2  *fParent;
 
 
-  ClassDefOverride(GH1D,100)
+  ClassDefOverride(GH1D,102)
 };
 
 #endif

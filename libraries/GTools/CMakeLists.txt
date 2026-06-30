@@ -1,6 +1,6 @@
 
 #this will compile the current library.
-add_library(GTOOLS SHARED GNucleus.cxx GTransition.cxx)
+add_library(GTOOLS SHARED GNucleus.cxx GDecayNucleus.cxx GTransition.cxx)
 
 target_include_directories(GTOOLS PUBLIC
   ${CMAKE_SOURCE_DIR}/include 
@@ -9,6 +9,7 @@ target_include_directories(GTOOLS PUBLIC
 
 root_generate_dictionary(G__GTOOLS 
   GNucleus.h 
+  GDecayNucleus.h
   GTransition.h
   MODULE GTOOLS 
   LINKDEF Linkdef.h
@@ -25,4 +26,9 @@ configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/mass.dat
   ${CMAKE_BINARY_DIR}/data/mass.dat
   COPYONLY
+)
+
+file(COPY
+  ${CMAKE_SOURCE_DIR}/libraries/SourceData
+  DESTINATION ${CMAKE_BINARY_DIR}/data
 )

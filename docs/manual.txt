@@ -75,26 +75,36 @@ ROIs automatically update their shaded range when the histogram is rebinned or u
      1173.2 keV
      1332.5 keV
 
-4. Create a calibration points file.
-
-   Make a plain text file with one calibration point per line:
-
-     measured_channel known_energy
-
-   Example:
-
-     429.8  1173.2
-     488.6  1332.5
-
-   Optional uncertainties may be added as third and fourth columns:
-
-     measured_channel known_energy channel_uncertainty energy_uncertainty
-
-5. Generate a .cal file.
+4. Create a calibrator and load the source's decay radiation.
 
    In Groot, run:
 
-     MakeCalibration("channelenergy.dat", "test.cal", 1)
+     GDecayNucleus co60("60Co");
+     GCalibrator cal;
+     cal.AddData(GrabHist(), co60);
+
+   For quick interactive use, the same automatic calibration pass can be
+   started when the calibrator is created:
+
+     GCalibrator cal(GrabHist, "60Co");
+
+   By default AddData finds candidate spectrum peaks, matches them to source
+   lines, fits the matched peaks, adds accepted channel-to-energy points, and
+   runs a linear calibration fit. Inspect the result with:
+
+     cal.Print()
+
+   To only find candidate peaks without matching or fitting, pass false as
+   the third argument:
+
+     cal.AddData(GrabHist(), co60, false);
+
+   You can also add or correct accepted channel-to-energy matches explicitly:
+
+     cal.AddPeak(429.8, 1173.228, "Co60");
+     cal.AddPeak(488.6, 1332.492, "Co60");
+
+5. Fit the calibration.
 
    Use order 1 for a linear calibration:
 
@@ -106,13 +116,13 @@ ROIs automatically update their shaded range when the histogram is rebinned or u
 
    Example quadratic command:
 
-     MakeCalibration("channelenergy.dat", "test.cal", 2)
+     cal.Fit(2)
 
 6. Check calibration residuals.
 
-   Run:
+   Print the accepted points and residuals:
 
-     DrawCalibrationResiduals("channelenergy.dat", 1)
+     cal.Print()
 
    The residual plot shows:
 
@@ -122,20 +132,15 @@ ROIs automatically update their shaded range when the histogram is rebinned or u
    curved trend. If the residuals are poor, check the peak assignments or
    try a different calibration order.
 
-7. Apply the calibration.
+7. Apply the calibration to a copy of the spectrum.
 
-   To apply calibration while loading a .txt3 file:
-
-     ./bin/groot -g test.cal path/to/spectrum.txt3
-
-   To apply calibration to an already-open 1D histogram in Groot:
-
-     ApplyCalibration(GrabHist(), "test.cal")
+     TH1D* calibrated = cal.ApplyCalibration(GrabHist());
+     calibrated->Draw();
 
 8. Verify the calibrated spectrum.
 
-   The new calibrated histogram should have its x-axis labeled in the
-   calibration unit, usually keV.
+   The new calibrated histogram has energy-valued bin edges while the source
+   histogram remains unchanged.
 
    Known peaks should now appear near their expected energies.
 
@@ -146,7 +151,7 @@ ROIs automatically update their shaded range when the histogram is rebinned or u
      C0
      C1
      C2
-     unit
+     fit order, fit quality, and reference source
 
    Reuse this file for spectra measured with the same detector setup and
    acquisition conditions.

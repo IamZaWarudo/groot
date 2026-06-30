@@ -54,6 +54,8 @@ void GRootInteract();  //void so it doesn't repeatedly print the return to the t
 GInteractionInfo BuildInteractionInfo();
 bool DispatchInteraction(GInteractionInfo &info);
 const GInteractionInfo &GetLastInteractionInfo();
+void RequestCurrentPad(TVirtualPad* pad);
+TVirtualPad* TakeRequestedCurrentPad();
 
 
 bool GRootInteractHist(TH1* current,GInteractionInfo &info);

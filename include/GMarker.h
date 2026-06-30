@@ -9,6 +9,7 @@
 
 class TH1;
 class TCutG;
+class TMarker;
 
 enum class GMarkerType {
   kAll =0,
@@ -56,7 +57,7 @@ class GMarker  : public TObject {
     //void SetBG() { fIsBgRegion = true; SetLineColor(1); }
 
     GMarkerType GetType() const { return fType; }
-    void SetType(GMarkerType type) { fType = type; }
+    void SetType(GMarkerType type);
 
     bool IsPrimary()    const  { return fType == GMarkerType::kPrimary; }
     bool IsBackground() const  { return fType == GMarkerType::kBackground; }
@@ -75,10 +76,14 @@ class GMarker  : public TObject {
     double Y() const { return fY; }
 
   private:
+    void UpdateStyle();
+    void PaintBackgroundRegion() const;
+
     GMarkerType fType = GMarkerType::kPrimary;
     TH1 *fHist;
     TLine *fLineX;
-    TLine *fLineY;  
+    TLine *fLineY;
+    TMarker *fPoint;
 
     double fX;
     double fY;  

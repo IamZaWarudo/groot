@@ -1,17 +1,88 @@
 #include<GH1D.h>
 
+#include<GCommands.h>
+
+#include<algorithm>
+#include<cstdint>
 #include<cstdio>
+#include<cstring>
+#include<limits>
 
 #include<TSpectrum.h>
 #include<TPolyMarker.h>
 #include<TText.h>
 #include<TString.h>
 #include<TVirtualPad.h>
+#include<TCanvas.h>
+#include<TPad.h>
 #include<TROOT.h>
 #include<TBox.h>
+#include<TF1.h>
+#include<TGraph.h>
+#include<TLine.h>
+#include<TList.h>
+#include<TArrayD.h>
+#include<vector>
 
 #include "GROI.h"
 #include "TMath.h"
+
+namespace {
+
+TString ResidualPadName(const GH1D *hist,const char *suffix) {
+  return Form("__gh1d_residual_%zx_%s",
+              reinterpret_cast<std::uintptr_t>(hist),suffix);
+}
+
+TVirtualPad *FindPadContaining(TVirtualPad *pad,const TObject *object) {
+  if(!pad || !object || !pad->GetListOfPrimitives())
+    return nullptr;
+
+  if(pad->GetListOfPrimitives()->FindObject(object))
+    return pad;
+
+  TIter iter(pad->GetListOfPrimitives());
+  while(TObject *obj = iter.Next()) {
+    if(!obj->InheritsFrom(TVirtualPad::Class()))
+      continue;
+    if(TVirtualPad *found = FindPadContaining(static_cast<TVirtualPad*>(obj),object))
+      return found;
+  }
+
+  return nullptr;
+}
+
+TVirtualPad *FindPadByName(TVirtualPad *pad,const char *name) {
+  if(!pad || !name || !pad->GetListOfPrimitives())
+    return nullptr;
+
+  if(strcmp(pad->GetName(),name) == 0)
+    return pad;
+
+  TIter iter(pad->GetListOfPrimitives());
+  while(TObject *obj = iter.Next()) {
+    if(!obj->InheritsFrom(TVirtualPad::Class()))
+      continue;
+    auto *child = static_cast<TVirtualPad*>(obj);
+    if(strcmp(child->GetName(),name) == 0)
+      return child;
+    if(TVirtualPad *found = FindPadByName(child,name))
+      return found;
+  }
+
+  return nullptr;
+}
+
+void LockFrameIfPresent(TVirtualPad *pad) {
+  if(!pad || !pad->GetListOfPrimitives())
+    return;
+
+  TBox *frame = static_cast<TBox*>(pad->GetListOfPrimitives()->FindObject("TFrame"));
+  if(frame)
+    frame->SetBit(TBox::kCannotMove);
+}
+
+} // namespace
 
 
 GH1D::GH1D() : TH1D(), fOriginal(0) { Init(); }
@@ -77,6 +148,7 @@ GH1D::~GH1D() {
   //printf("GH1D deleted\n"); fflush(stdout);  
   if(fOriginal) delete fOriginal;
   if(fBg)       delete fBg;
+  if(fResidualHist) delete fResidualHist;
 
   //TH1D::~TH1D();
 } 
@@ -87,6 +159,11 @@ void GH1D::Init() {
   fParent = 0;
   fBg = 0;
   fIsNormalized = false;
+  fShowResiduals = false;
+  fResidualFit = nullptr;
+  fResidualHist = nullptr;
+  fResidualXLow = std::numeric_limits<double>::quiet_NaN();
+  fResidualXHigh = std::numeric_limits<double>::quiet_NaN();
 }
 
 
@@ -155,6 +232,231 @@ void GH1D::Draw(Option_t *opt) {
     }
   }
   return; 
+}
+
+void GH1D::SetShowResiduals(bool flag) {
+  fShowResiduals = flag;
+  if(gPad)
+    UpdateResidualDisplay(gPad);
+}
+
+void GH1D::ToggleResiduals() {
+  SetShowResiduals(!ShowResiduals());
+  printf("Residual display %s for %s\n",ShowResiduals() ? "on" : "off",GetName());
+}
+
+void GH1D::SetResidualFit(TF1 *fit,double xlow,double xhigh) {
+  if(xlow>xhigh)
+    std::swap(xlow,xhigh);
+
+  fResidualFit = fit;
+  fResidualXLow  = xlow;
+  fResidualXHigh = xhigh;
+
+  if(ShowResiduals())
+    UpdateResidualDisplay(gPad);
+}
+
+void GH1D::ClearResidual() {
+  fResidualFit = nullptr;
+  if(fResidualHist) {
+    delete fResidualHist;
+    fResidualHist = nullptr;
+  }
+  fResidualXLow = std::numeric_limits<double>::quiet_NaN();
+  fResidualXHigh = std::numeric_limits<double>::quiet_NaN();
+  if(ShowResiduals())
+    UpdateResidualDisplay(gPad);
+}
+
+TH1D *GH1D::MakeResidualHist() const {
+  double viewLow = GetXaxis()->GetBinLowEdge(GetXaxis()->GetFirst());
+  double viewHigh = GetXaxis()->GetBinUpEdge(GetXaxis()->GetLast());
+  if(viewLow>viewHigh)
+    std::swap(viewLow,viewHigh);
+
+  TString name = Form("__%s_residuals",GetName());
+  TH1D *residual = nullptr;
+  const TArrayD *xbins = GetXaxis()->GetXbins();
+  if(xbins && xbins->GetSize() > 0) {
+    residual = new TH1D(name,"",
+                        GetNbinsX(),xbins->GetArray());
+  } else {
+    residual = new TH1D(name,"",
+                        GetNbinsX(),GetXaxis()->GetXmin(),GetXaxis()->GetXmax());
+  }
+
+  residual->SetDirectory(nullptr);
+  residual->SetStats(false);
+  residual->SetLineColor(kBlue + 2);
+  residual->SetMarkerColor(kBlue + 2);
+  residual->SetMarkerStyle(kFullCircle);
+  residual->SetMarkerSize(0.35);
+
+  double maxAbs = 0.0;
+  for(int bin = 1; bin <= GetNbinsX(); ++bin) {
+    const double x = GetXaxis()->GetBinCenter(bin);
+    if(x < viewLow || x > viewHigh)
+      continue;
+
+    double fitLow = fResidualXLow;
+    double fitHigh = fResidualXHigh;
+    if(fitLow>fitHigh)
+      std::swap(fitLow,fitHigh);
+
+    const bool inFitRegion = fResidualFit && std::isfinite(fitLow) && std::isfinite(fitHigh) &&
+                             x >= fitLow && x <= fitHigh;
+    const double value = inFitRegion ? GetBinContent(bin) - fResidualFit->Eval(x) : 0.0;
+    residual->SetBinContent(bin,value);
+    residual->SetBinError(bin,GetBinError(bin));
+    maxAbs = std::max(maxAbs,std::abs(value));
+  }
+
+  if(maxAbs <= 0.0 || !std::isfinite(maxAbs))
+    maxAbs = 1.0;
+  residual->SetMinimum(-1.15*maxAbs);
+  residual->SetMaximum( 1.15*maxAbs);
+  residual->GetXaxis()->SetRangeUser(viewLow,viewHigh);
+  residual->GetXaxis()->SetTitle("");
+  residual->GetYaxis()->SetTitle("");
+  residual->GetYaxis()->SetTitleSize(0.10);
+  residual->GetYaxis()->SetLabelSize(0.08);
+  residual->GetXaxis()->SetTitleSize(0.11);
+  residual->GetXaxis()->SetLabelSize(0.10);
+
+  return residual;
+}
+
+void GH1D::UpdateResidualDisplay(TVirtualPad *pad) {
+  TVirtualPad *rootPad = pad ? pad : gPad;
+  if(!rootPad)
+    return;
+  if(rootPad->GetCanvas())
+    rootPad = rootPad->GetCanvas();
+
+  const TString histPadName = ResidualPadName(this,"hist");
+  const TString residualPadName = ResidualPadName(this,"residual");
+
+  TVirtualPad *drawingPad = FindPadContaining(rootPad,this);
+  TVirtualPad *histPad = FindPadByName(rootPad,histPadName.Data());
+  TVirtualPad *residualPad = FindPadByName(rootPad,residualPadName.Data());
+  TVirtualPad *container = drawingPad ? drawingPad : pad;
+
+  if(histPad && residualPad) {
+    if(auto *tp = dynamic_cast<TPad*>(histPad)) {
+      if(tp->GetMother())
+        container = tp->GetMother();
+    }
+  }
+
+  if(!container)
+    return;
+
+  const bool haveSplitPads = histPad && residualPad;
+  TString drawOption = GetDrawOption();
+
+  if(!ShowResiduals()) {
+    if(haveSplitPads) {
+      container->cd();
+      container->Clear();
+      TH1D::Draw(drawOption.Data());
+      container->Modified();
+      container->Update();
+      LockFrameIfPresent(container);
+      RequestCurrentPad(container);
+    }
+    return;
+  }
+
+  if(!haveSplitPads) {
+    container->cd();
+    container->Clear();
+
+    TPad *newHistPad = new TPad(histPadName,histPadName,0.0,0.26,1.0,1.0);
+    TPad *newResidualPad = new TPad(residualPadName,residualPadName,0.0,0.0,1.0,0.26);
+
+    newHistPad->SetBottomMargin(0.0);
+    newHistPad->SetFillStyle(4000);
+    newHistPad->AddExec("groot_interact","GRootInteract()");
+    newResidualPad->SetTopMargin(0.0);
+    newResidualPad->SetBottomMargin(0.32);
+    newResidualPad->SetFillStyle(4000);
+    newResidualPad->AddExec("groot_interact","GRootInteract()");
+
+    newHistPad->Draw();
+    newResidualPad->Draw();
+    histPad = newHistPad;
+    residualPad = newResidualPad;
+  }
+
+  histPad->cd();
+  histPad->Clear();
+  TH1D::Draw(drawOption.Data());
+  histPad->Modified();
+  histPad->Update();
+  LockFrameIfPresent(histPad);
+
+  residualPad->cd();
+  residualPad->Clear();
+  if(fResidualHist) {
+    delete fResidualHist;
+    fResidualHist = nullptr;
+  }
+  fResidualHist = MakeResidualHist();
+  if(fResidualHist) {
+    fResidualHist->Draw("hist");
+
+    double viewLow = GetXaxis()->GetBinLowEdge(GetXaxis()->GetFirst());
+    double viewHigh = GetXaxis()->GetBinUpEdge(GetXaxis()->GetLast());
+    if(viewLow>viewHigh)
+      std::swap(viewLow,viewHigh);
+
+    double fitLow = fResidualXLow;
+    double fitHigh = fResidualXHigh;
+    if(fitLow>fitHigh)
+      std::swap(fitLow,fitHigh);
+
+    if(fResidualFit && std::isfinite(fitLow) && std::isfinite(fitHigh)) {
+      const double fillLow = std::max(viewLow,fitLow);
+      const double fillHigh = std::min(viewHigh,fitHigh);
+      if(fillLow < fillHigh) {
+        std::vector<double> x;
+        std::vector<double> y;
+        x.push_back(fillLow);
+        y.push_back(0.0);
+        for(int bin = 1; bin <= fResidualHist->GetNbinsX(); ++bin) {
+          const double center = fResidualHist->GetXaxis()->GetBinCenter(bin);
+          if(center < fillLow || center > fillHigh)
+            continue;
+          x.push_back(std::max(fillLow,fResidualHist->GetXaxis()->GetBinLowEdge(bin)));
+          y.push_back(fResidualHist->GetBinContent(bin));
+          x.push_back(std::min(fillHigh,fResidualHist->GetXaxis()->GetBinUpEdge(bin)));
+          y.push_back(fResidualHist->GetBinContent(bin));
+        }
+        x.push_back(fillHigh);
+        y.push_back(0.0);
+        if(x.size() > 2) {
+          TGraph *fill = new TGraph(static_cast<int>(x.size()),x.data(),y.data());
+          fill->SetFillColorAlpha(kAzure + 2,0.30);
+          fill->SetLineColorAlpha(kAzure + 2,0.0);
+          fill->SetBit(TObject::kCanDelete);
+          fill->Draw("f same");
+          fResidualHist->Draw("hist same");
+        }
+      }
+    }
+
+    TLine *zero = new TLine(viewLow,0.0,viewHigh,0.0);
+    zero->SetLineColor(kGray + 2);
+    zero->SetLineStyle(kDashed);
+    zero->SetBit(TObject::kCanDelete);
+    zero->Draw();
+  }
+  residualPad->Modified();
+  residualPad->Update();
+
+  histPad->cd();
+  RequestCurrentPad(histPad);
 }
 
 TH1* GH1D::DrawCopy(Option_t *opt, const char *name_postfix) const {
@@ -495,6 +797,3 @@ int GH1D::ShowPeaks(double thresh,double sigma) {
   GetListOfFunctions()->Add(array);
   return n;
 }
-
-
-

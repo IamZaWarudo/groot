@@ -27,9 +27,49 @@ Canvas.ShowGuideLines: false
 GMarker.Primary.Max:    2
 GMarker.Background.Max: 2
 GMarker.Zoom.Max:       2
-GMarker.Fit.Max:        2
-GMarker.Cut.Max         2
-GMarker.Projection:     2
+GMarker.Fit.Max:       -1
+GMarker.Cut.Max:       -1
+GMarker.Projection.Max: 2
+
+#GMarker style properties
+# Colors are ROOT color numbers; styles use ROOT line/marker style numbers.
+GMarker.Primary.Color:       632  # kRed
+GMarker.Primary.Width:       2
+GMarker.Primary.Style:       1    # kSolid
+GMarker.Primary.MarkerStyle: 20
+GMarker.Primary.MarkerSize:  1.10
+
+GMarker.Background.Color:       862  # kAzure+2
+GMarker.Background.Width:       2
+GMarker.Background.Style:       2    # kDashed
+GMarker.Background.MarkerStyle: 20
+GMarker.Background.MarkerSize:  1.10
+GMarker.Background.FillAlpha:   0.25
+
+GMarker.Zoom.Color:       418  # kGreen+2
+GMarker.Zoom.Width:       2
+GMarker.Zoom.Style:       2
+GMarker.Zoom.MarkerStyle: 20
+GMarker.Zoom.MarkerSize:  1.10
+
+GMarker.Fit.Color:       881  # kViolet+1
+GMarker.Fit.Width:       2
+GMarker.Fit.Style:       1
+GMarker.Fit.MarkerStyle: 20
+GMarker.Fit.MarkerSize:  1.10
+
+GMarker.Cut.Color:        807  # kOrange+7
+GMarker.Cut.Width:        2
+GMarker.Cut.Style:        1
+GMarker.Cut.ClosingStyle: 2
+GMarker.Cut.MarkerStyle:  20
+GMarker.Cut.MarkerSize:   0.65
+
+GMarker.Projection.Color:       617  # kMagenta+1
+GMarker.Projection.Width:       2
+GMarker.Projection.Style:       3    # kDotted
+GMarker.Projection.MarkerStyle: 20
+GMarker.Projection.MarkerSize:  1.10
 
 
 Hists.Stats: "neiou"

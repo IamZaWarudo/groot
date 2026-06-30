@@ -47,6 +47,9 @@ class GCanvas : public TCanvas {
     static Event_t GetCurrentEvent() { return fCurrentEvent; }
 
   private:
+    ECursor CursorForSelected(TObject *selected) const;
+    void UpdateCursorForSelected(EEventType event);
+
     static Event_t fCurrentEvent;
 
     EEventType fEvent;
@@ -54,6 +57,8 @@ class GCanvas : public TCanvas {
     int        fEventy;
 
     bool fLockPads;
+    bool fManagedCursorActive;
+    ECursor fManagedCursor;
 
     static int fCanvasNumber;
 

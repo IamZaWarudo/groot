@@ -227,6 +227,9 @@ GH1D* GH2D::ProjectionX(double low,double up,Option_t *option) {
 }    
 
 GH1D* GH2D::ProjectionX(double low, double up, double bg_low, double bg_high, Option_t *opt) {
+  if(low > up) std::swap(low,up);
+  if(bg_low > bg_high) std::swap(bg_low,bg_high);
+
   int blow,bup,bbglow,bbgup;
   blow = GetYaxis()->FindBin(low);
   bup  = GetYaxis()->FindBin(up);
@@ -237,7 +240,11 @@ GH1D* GH2D::ProjectionX(double low, double up, double bg_low, double bg_high, Op
   
   std::string pname = Form("%s_x_%i_%i_%i_%i",GetName(),blow,bup,bbglow,bbgup);
   add->SetNameTitle(pname.c_str(),pname.c_str());
-  add->Add(sub,-1);
+  // Projection construction preserves the user-defined gates. A future,
+  // explicit background-normalization option can scale this subtraction.
+  add->Add(sub,-1.0);
+  fProjections.Remove(sub);
+  delete sub;
 
   return add;
 }
@@ -279,6 +286,8 @@ GH1D* GH2D::ProjectionY(double low,double up,Option_t *option) {
 } 
 
 GH1D* GH2D::ProjectionY(double low, double up, double bg_low, double bg_high, Option_t *opt) {
+  if(low > up) std::swap(low,up);
+  if(bg_low > bg_high) std::swap(bg_low,bg_high);
 
   int blow,bup,bbglow,bbgup;
   blow = GetXaxis()->FindBin(low);
@@ -291,7 +300,11 @@ GH1D* GH2D::ProjectionY(double low, double up, double bg_low, double bg_high, Op
   
   std::string pname = Form("%s_y_%i_%i_%i_%i",GetName(),blow,bup,bbglow,bbgup);
   add->SetNameTitle(pname.c_str(),pname.c_str());
-  add->Add(sub,-1);
+  // Projection construction preserves the user-defined gates. A future,
+  // explicit background-normalization option can scale this subtraction.
+  add->Add(sub,-1.0);
+  fProjections.Remove(sub);
+  delete sub;
 
   return add;
 }
@@ -333,4 +346,3 @@ GH1D* GH2D::Previous(const GH1D* current) const {
 
 
   }
-
